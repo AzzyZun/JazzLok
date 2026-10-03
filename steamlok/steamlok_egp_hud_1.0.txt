@@ -1,0 +1,276 @@
+@name Steamlok EGP HUD 1.0
+@inputs [EGP]:wirelink Seat:entity
+@inputs G_BoilerPressure G_BoilerWater G_TankWater G_FireBoxCoal G_BunkerCoal G_Fire G_Draught G_Regulator G_Direction G_Blower G_Damper G_TE G_Handbrake G_SteamBrake G_BrakeMode G_BrakeCylinder G_CrownDamage G_SafetyFlow
+@persist Init PanelX PanelY BarW BarH Gap PanelW PanelH TitleSize LabelSize ScaleY
+@persist AlertAny LastAlertTime G_NextTick
+@trigger none
+
+if (first() | dupefinished()) 
+{
+    Init = 0
+    AlertAny = 0
+    LastAlertTime = 0
+}
+
+local Viewer = (Seat:isValid() & Seat:driver():isValid()) ? Seat:driver() : owner()
+local Scr = egpScrSize(Viewer)
+local ScrW = Scr:x()
+local ScrH = Scr:y()
+
+if (ScrW < 640) { ScrW = 1920 }
+if (ScrH < 480) { ScrH = 1080 }
+
+if (!Init) 
+{
+    EGP:egpClear()
+
+    local Sx = ScrW / 1920
+    local Sy = ScrH / 1080
+    local S = min(Sx, Sy)
+
+    ScaleY = Sy
+    PanelW = 160 * Sx
+    PanelH = 500 * Sy
+    BarW = 140 * Sx
+    BarH = 12 * Sy
+    Gap = 28 * Sy
+    
+    TitleSize = max(10, 14 * S)
+    LabelSize = max(8, 10 * S)
+
+    local MarginR = 50 * Sx
+    local MarginT = 40 * Sy
+    
+    PanelX = ScrW - PanelW - MarginR + 10 * Sx
+    PanelY = MarginT
+
+    EGP:egpBox(1, vec2(PanelX - 10 * Sx + PanelW / 2, PanelY - 20 * Sy + PanelH / 2), vec2(PanelW, PanelH))
+    EGP:egpColor(1, vec4(0, 0, 0, 255))
+
+    EGP:egpText(2, "STEAMLOK", vec2(PanelX, PanelY - 16 * Sy))
+    EGP:egpAlign(2, 0, 0)
+    EGP:egpColor(2, vec4(220, 220, 200, 255))
+    EGP:egpSize(2, TitleSize)
+
+    local Names = array(
+        "BOILER PRESSURE", 
+        "WATER LEVEL", 
+        "WATER TANK", 
+        "FIREBOX COAL", 
+        "COAL BUNKER",
+        "FIRE", 
+        "DRAUGHT", 
+        "REGULATOR", 
+        "CUTOFF", 
+        "BLOWER", 
+        "DAMPER", 
+        "TE",
+        "LOCO HANDBRAKE", 
+        "STEAM BRAKE", 
+        "TRAIN BRAKE", 
+        "CROWN DAMAGE"
+    )
+
+    local I = 1
+    
+    while (I <= Names:count()) 
+    {
+        local YI = PanelY + (I - 1) * Gap
+        local L = 10 + (I - 1) * 3
+        local B = L + 1
+        local F = L + 2
+        local BarY = YI + 14 * Sy
+
+        EGP:egpText(L, Names[I, string], vec2(PanelX, YI))
+        EGP:egpAlign(L, 0, 0)
+        EGP:egpColor(L, vec4(200, 200, 200, 255))
+        EGP:egpSize(L, LabelSize)
+
+        EGP:egpBox(B, vec2(PanelX + BarW / 2, BarY + BarH / 2), vec2(BarW, BarH))
+        EGP:egpColor(B, vec4(40, 40, 40, 200))
+
+        EGP:egpBox(F, vec2(PanelX + 0.5, BarY + BarH / 2), vec2(1, BarH))
+        EGP:egpColor(F, vec4(80, 180, 80, 255))
+
+        I++
+    }
+
+    Init = 1
+}
+
+function number sat(N:number) 
+{
+    return clamp(N, 0, 1)
+}
+
+event tick() 
+{
+    if(curtime() >= G_NextTick) 
+    {
+        local MaxP = 150
+        local OpMin = 100          
+        local FlashOn = (floor(curtime() * 4) % 2) == 0
+        
+        local AttnPressure = (G_SafetyFlow > 0.01) | (G_BoilerPressure >= MaxP - 1)
+        local AttnWater = G_BoilerWater < 0.15
+        local AttnTank = G_TankWater < 0.4
+        local AttnBunker = G_BunkerCoal < 0.1
+        local AttnCrown = G_CrownDamage > 0.15
+        local AttnFire = (G_Fire < 0.15) & (abs(G_Direction) > 0.2) & (G_Regulator > 0.2)
+        
+        local Attn = array(
+            AttnPressure ? 1 : 0,
+            AttnWater ? 1 : 0,
+            AttnTank ? 1 : 0,
+            0,
+            AttnBunker ? 1 : 0,
+            AttnFire ? 1 : 0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            AttnCrown ? 1 : 0
+        )
+        
+        if (AttnWater) 
+        {
+            if ((!AlertAny) | (curtime() >= LastAlertTime + 4)) 
+            {
+                Seat:emitSound("andyspack/memes/dyui.mp3", 70, 100, 1.0)
+                LastAlertTime = curtime()
+            }
+            
+            AlertAny = 1
+        }
+        else 
+        {
+            AlertAny = 0
+        }
+        
+        local SteamAmt = sat(G_SteamBrake * (G_BoilerPressure / 100))
+        
+        local Vals = array(
+            sat(G_BoilerPressure / MaxP),
+            sat(G_BoilerWater),
+            sat(G_TankWater / 4.0),
+            sat(G_FireBoxCoal),
+            sat(G_BunkerCoal),
+            sat(G_Fire),
+            sat(G_Draught),
+            sat(G_Regulator),
+            sat(abs(G_Direction)),
+            sat(G_Blower),
+            sat(G_Damper),
+            sat(G_TE / 20000),
+            sat(G_Handbrake),
+            SteamAmt,
+            sat(G_BrakeCylinder / 65),
+            sat(G_CrownDamage)
+        )
+        
+        local Colors = array(
+            vec(80, 160, 255),
+            vec(60, 140, 220),
+            vec(40, 120, 200),
+            vec(90, 90, 90),
+            vec(90, 90, 90),
+            vec(220, 100, 40),
+            vec(160, 160, 200),
+            vec(200, 200, 80),
+            vec(200, 160, 80),
+            vec(180, 180, 220),
+            vec(100, 180, 100),
+            vec(80, 200, 80),
+            vec(200, 60, 60),
+            vec(180, 200, 220),
+            vec(220, 180, 60),
+            vec(220, 40, 40)
+        )
+        
+        local PColor = vec(80, 160, 255)
+        
+        if (AttnPressure)
+        {
+            PColor = vec(220, 40, 40)
+        }
+        elseif ((G_BoilerPressure >= OpMin) & (G_BoilerPressure < MaxP)) 
+        {
+            PColor = vec(60, 200, 70)
+        }
+        
+        Colors[1, vector] = PColor
+        Colors[16, vector] = vec(180 + 75 * G_CrownDamage, 40, 40)
+        
+        local I = 1
+        while (I <= Vals:count()) 
+        {
+            local YI = PanelY + (I - 1) * Gap
+            local BarY = YI + 14 * ScaleY
+            local L = 10 + (I - 1) * 3
+            local B = L + 1
+            local F = L + 2
+            local T = Vals[I, number]
+            local C = Colors[I, vector]
+            local A = Attn[I, number]
+        
+            local FillW = max(1, BarW * T)
+        
+            local Col = C
+            local LabelCol = vec(200, 200, 200)
+            
+            if (A & FlashOn) 
+            {
+                Col = vec(255, 60, 60)
+                LabelCol = vec(255, 80, 80)
+            }
+            elseif (A) 
+            {
+                Col = vec(C:x() * 0.5, C:y() * 0.5, C:z() * 0.5)
+                LabelCol = vec(180, 100, 100)
+            }
+        
+            local Selected = 0
+            
+            if ((I == 13) & (G_BrakeMode == 0)) { Selected = 1 }
+            if ((I == 14) & (G_BrakeMode == 1)) { Selected = 1 }
+            if ((I == 15) & (G_BrakeMode == 2)) { Selected = 1 }
+            
+            if (Selected)
+            {
+                LabelCol = vec(255, 255, 220)
+                if (!A)
+                {
+                    Col = vec(min(255, C:x() + 40), min(255, C:y() + 40), min(255, C:z() + 40))
+                }
+            }
+        
+            EGP:egpSize(F, vec2(FillW, BarH))
+            EGP:egpPos(F, vec2(PanelX + FillW / 2, BarY + BarH / 2))
+            EGP:egpColor(F, vec4(Col:x(), Col:y(), Col:z(), 255))
+        
+            EGP:egpColor(L, vec4(LabelCol:x(), LabelCol:y(), LabelCol:z(), 255))
+        
+            if (A & FlashOn) 
+            {
+                EGP:egpColor(B, vec4(80, 20, 20, 220))
+            }
+            elseif (Selected) 
+            {
+                EGP:egpColor(B, vec4(55, 55, 40, 220))
+            }
+            else 
+            {
+                EGP:egpColor(B, vec4(40, 40, 40, 200))
+            }
+        
+            I++
+        }
+        
+        G_NextTick = curtime() + 0.1
+    }
+}
