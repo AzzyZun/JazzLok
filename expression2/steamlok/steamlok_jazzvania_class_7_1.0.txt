@@ -1,0 +1,1437 @@
+@name Steamlok Jazzvania Class 7 1.0
+@inputs [Base Seat]:entity G_WheelAng G_TankFill G_CoalFill
+
+@outputs G_BoilerPressure G_TE G_FireBoxCoal G_BoilerWater G_TankWater G_BunkerCoal G_WaterInjector G_Direction 
+@outputs G_Regulator G_Handbrake G_SteamBrake G_Damper G_Blower G_AddCoal G_Draught G_Fire G_NetForce
+@outputs G_BrakeForce G_UseSteamBrake G_BrakeMode G_MPH G_SafetyFlow G_WheelAng G_Blowdown G_CylinderCocks 
+@outputs G_TrainBrake G_ChugSoundIndex G_CrownDamage G_TankWater  G_SteamChugPulse G_SteamChugloop 
+@outputs G_Whistle G_Whistle2 G_ToggleFireDoor G_HDLT G_ParticleEffect:string G_BoilerExplosion 
+@outputs G_MainReservoir G_CompressorOn G_PrevBrakePipe G_EqualReservoir G_BrakePipe G_BrakeCylinder G_TrainBrake
+
+@persist G_NextTick G_LastTime
+@persist G_BoilerPressure G_FireBoxCoal G_BoilerWater G_TankWater G_BunkerCoal G_WaterInjector 
+@persist G_Direction G_Regulator G_Handbrake G_SteamBrake G_Damper G_Blower G_Draught G_Fire G_NetForce
+@persist G_NextScan G_LastMat:string G_SteamChugPulse G_SafetyNominal G_SafetyHoldUntil 
+@persist G_Whistle G_Whistle2 G_ToggleFire G_ToggleFireDoor G_HDLT G_EasyDoorUntil G_AutoShoveling
+@persist G_BrakeMat:string G_ParkHolding G_SmokeSwing G_UseSteamBrake G_BrakeMode G_ToggleAddCoal
+@persist [G_RegH G_DirH G_BlowH G_DampH G_HBH G_SBH]:array G_RegNotch G_DirNotch G_HBNotch G_SBNotch G_TBNotch
+@persist G_LoopBlowerOn G_LoopInjectorOn G_LoopDraughtOn G_LoopSafetyOn G_LoopRollingOn G_LoopRolling2On 
+@persist G_LoopBrakingOn G_LoopSBVentOn G_SteamBrakePrev G_SBVentFadeT G_SBVentLiveVol [G_WeldedEnts]:array
+@persist G_SafetyFlow G_WheelAng G_Cutoff G_Blowdown G_CylinderCocks G_ChugSoundIndex G_LastChuffIdx G_CrownDamage
+@persist G_NextChugTime G_SteamChugloop [G_ChugSndSoft G_ChugSndHard]:string G_NextChugSwitch G_LoopBand G_NextBand 
+@persist G_WasSteamChugloop G_WasSteamChugPulse G_BoilerExplosionForce
+@persist G_MainReservoir G_CompressorOn G_PrevBrakePipe G_EqualReservoir G_BrakePipe G_BrakeCylinder G_TrainBrake
+
+@trigger none 
+@strict
+@model models/jaanus/wiretool/wiretool_input.mdl
+
+if(first() || dupefinished())
+{   
+    G_THROTTLE_MUL        = 1.0
+    G_BRAKE_MUL           = 1.0
+    G_AUTO_FIREMAN        = 1
+    G_INFINITE_RESOURCES  = 1
+    G_WEIGHTSCALE         = 0.76
+    G_WATER_USE_MUL       = 0.1  
+
+    G_CYLINDERDIAMETER = 10
+    G_PISTONSTROKE     = 16
+    G_WHEELSIZE        = 38
+    G_EFFICIENCY       = 0.85
+    G_LINK_EXPANSION   = 0.55   
+    G_MPH_MAX          = 25
+    
+    G_WEIGHT           = 40000
+    G_ADHESION         = 0.25     
+    
+    KEY_DIRECTION_FORWARD  = "up"
+    KEY_DIRECTION_REVERSE  = "down"
+    KEY_REGULATOR_OPEN     = "w"
+    KEY_REGULATOR_SHUT     = "s"
+    KEY_BLOWER_OPEN        = "pad_1"
+    KEY_BLOWER_SHUT        = "pad_2"
+    KEY_DAMPER_OPEN        = "pad_4"
+    KEY_DAMPER_SHUT        = "pad_5"
+    KEY_BRAKE_APPLY        = "a"
+    KEY_BRAKE_RELEASE      = "d"
+    KEY_BRAKE_MODE         = "lshift"
+    KEY_BRAKE_MODE_ALT     = "rshift"
+    KEY_HEADLIGHT_UP       = "1"
+    KEY_HEADLIGHT_DOWN     = "2"
+    KEY_INJECTOR           = "pad_3"
+    KEY_BLOWDOWN           = "pad_9"
+    KEY_CYLINDER_COCKS     = "pad_6"
+    KEY_FIRE_DOOR          = "pad_enter"
+    KEY_ADD_COAL           = "pad_0"
+    KEY_TOGGLE_FIRE        = "pad_plus"
+    KEY_WHISTLE            = "r"
+    KEY_WHISTLE2           = "f"
+    
+    G_STEAM_BRAKE_FORCE        = 4000
+    G_HANDBRAKE_FORCE          = 2250
+    G_TRAINBRAKE_FORCE_PER_CAR = 6000     
+    G_TRAINBRAKE_LOCO_FORCE    = 6000
+    
+    G_AIR_BC_MAX               = 65    
+    G_AIR_SERVICE_DROP         = 40    
+    G_COMPRESSOR_MIN           = 120   
+    G_COMPRESSOR_MAX           = 140   
+        
+    G_FX_POS_STACK         = vec(76, 0, 75)
+    G_FX_POS_SAFETY        = vec(-54, 0, 70)
+    G_FX_POS_COCK_L        = vec(75, -40, -25)
+    G_FX_POS_COCK_R        = vec(75, 40, -25)
+    G_FX_POS_BLOWDOWN      = vec(-78, -27, -32)
+    G_FX_POS_SBVENT        = vec(-78, 0, -10)
+    
+    G_FX_STACK_SSIZE       = 2
+    G_FX_STACK_SSIZE_GAIN  = 30
+    G_FX_STACK_ESIZE_MUL   = 5
+    G_FX_STACK_ALPHA       = 2.5
+    
+    G_FX_SAFETY_SSIZE      = 8
+    G_FX_SAFETY_SSIZE_GAIN = 8
+    G_FX_SAFETY_SSIZE_MUL  = 0.35
+    G_FX_SAFETY_ESIZE_MUL  = 10
+    G_FX_SAFETY_ALPHA      = 90
+    
+    G_FX_COCK_SSIZE        = 4
+    G_FX_COCK_SSIZE_GAIN   = 6
+    G_FX_COCK_ESIZE_MUL    = 4
+    G_FX_COCK_ALPHA        = 160
+    
+    G_FX_BLOW_SSIZE        = 2
+    G_FX_BLOW_ESIZE_MUL    = 32
+    G_FX_BLOW_ALPHA        = 400
+    
+    G_FX_SBVENT_SSIZE      = 2
+    G_FX_SBVENT_ESIZE_MUL  = 10
+    G_FX_SBVENT_ALPHA      = 400
+    
+    # Relative capacities sized like a small Manning Wardle / NSB 7a-class 0-4-0ST
+    G_TANKCAPACITY   = 4.0    # water tank vs boiler glass (1.0)
+    G_COALCAPACITY   = 8.0    # bunker holds this many firebed-loads; G_BunkerCoal itself is 0.0 - 1.0
+    G_BOILERVOLUME   = 1.0    # pressure inertia for this small tank engine
+
+    # Example directories are that have compatible sound samples (assuming you have them installed): 
+    # usa_locomotive_sounds/...
+    # triggerboyswhistles/...
+    # train sounds/...
+    # tf2_scouts_loop_sounds/...
+    # parkmanpack/...
+    # az2933_sounds/...
+    # braixssoundcollection/...
+
+    G_LOCO_SOUND_ROOT_DIR = "train sounds/de/steam/chuff"
+    
+    # Hard and soft are volume crossfaded depending how much steam the locomotive is pushing to the pistons.
+    G_LOCO_SOUND_SOFT_TYPE = "express 3"
+    G_LOCO_SOUND_HARD_TYPE = "freight 3"    
+    
+    # RPM Ranges must match the sound RPM ranges or things might sound odd
+    G_LOCO_RPM_RANGES = array(50, 60, 75, 90, 100, 125, 150, 175, 200, 250, 300, 350, 400)    
+    
+    G_LOCO_SOUND_RPM_RANGES = array(
+        "steam_loop_50rpm.wav", 
+        "steam_loop_60rpm.wav",  
+        "steam_loop_75rpm.wav",
+        "steam_loop_90rpm.wav", 
+        "steam_loop_100rpm.wav",  
+        "steam_loop_125rpm.wav",  
+        "steam_loop_150rpm.wav",
+        "steam_loop_175rpm.wav",
+        "steam_loop_200rpm.wav",
+        "steam_loop_250rpm.wav",        
+        "steam_loop_300rpm.wav", 
+        "steam_loop_350rpm.wav", 
+        "steam_loop_400rpm.wav"                                                                                            
+    )
+    
+    G_LOCO_SOUND_CHUG_SINGLES = array(
+        "piston_stroke1.wav",
+        "piston_stroke2.wav",
+        "piston_stroke3.wav",
+        "piston_stroke4.wav"                                                                                          
+    )
+            
+    # Sound sample paths
+    G_SND_CTRL_NOTCH       = "wam98_sounds/trains/cab/controls/ee_metal_button_off1.wav"
+    G_SND_CTRL_END         = "wam98_sounds/trains/cab/controls/ee_km-26/power_handle_full.wav"
+    G_SND_HB_RATCHET       = "anthonyssoundcollection/misc/ratcheting brake wheel.wav"
+    G_SND_SB_VENT          = "hazardous_sound_pack/hazardous-sounds/steamhiss9.wav"
+    G_SND_ROLLING          = "random_things/other_train_noises/rolling_wheels_loop.wav"
+    G_SND_ROLLING2         = "rolling_stock/coaches/lner_teaks/bogies/gresley_bogie_rumble_5.wav"
+    G_SND_BRAKE_SQUEAL     = "wam98_sounds/trains/miscellaneous/brake_squeal_cast_iron.wav"
+    G_SND_FIRE_LIGHT       = "hazardous_sound_pack/hazardous-sounds/fire_light.wav"
+    G_SND_FIRE_OUT         = "hazardous_sound_pack/hazardous-sounds/fire_out.wav"
+    G_SND_FIREBOX_OPEN     = "tf2_scouts_loop_sounds/uk/lner_v2/firebox_open.wav"
+    G_SND_FIREBOX_CLOSE    = "tf2_scouts_loop_sounds/uk/lner_v2/firebox_close.wav"
+    G_SND_COAL_SHOVEL      = "train sounds/de/steam/misc/coal shoveling loop 9.wav"
+    G_SND_SHOVEL_HIT       = "tf2_scouts_loop_sounds/uk/lner_v2/shovel_hit.wav"
+    G_SND_SAFETY           = "hazardous_sound_pack/hazardous-sounds/steamhiss10.wav"
+    G_SND_BLOWER           = "hazardous_sound_pack/hazardous-sounds/steamhiss12.wav"
+    G_SND_INJECTOR         = "hazardous_sound_pack/hazardous-sounds/steamhiss15.wav"
+    G_SND_DRAUGHT          = "hazardous_sound_pack/hazardous-sounds/steamhiss2.wav"
+    G_SND_BLOWDOWN         = "train sounds/de/steam/misc/blowdown 3.wav"
+    G_SND_BLOWDOWN_END     = "train sounds/de/steam/misc/blowdown end 3.wav"
+    G_SND_FIRE_SMALL       = "ambient/fire/fire_small1.wav"
+    G_SND_FIRE_MED         = "ambient/fire/fire_med_loop1.wav"
+    G_SND_FIRE_BIG         = "ambient/fire/fire_big_loop1.wav"
+    G_SND_FIRE_WIND        = "ambient/wind/wind_tunnel1.wav"
+    G_SND_COMPRESSOR       = "train sounds/de/steam/misc/air pump 29.wav"
+            
+    G_SND_CROWN = array(
+        "physics/metal/metal_box_strain1.wav",
+        "physics/metal/metal_box_strain2.wav",
+        "physics/metal/metal_box_impact_soft1.wav",
+        "physics/metal/metal_box_impact_soft3.wav",
+        "physics/metal/metal_box_impact_hard1.wav",
+        "physics/metal/metal_box_impact_hard2.wav",
+        "physics/metal/metal_box_impact_bullet3.wav"
+    )
+    
+    G_SND_BOILER_WARN      = "cubics_pack/humor/the_fuck.mp3"
+    G_SND_BOILER_BLAST     = "hazardous_sound_pack/hazardous-sounds/cannon2.wav"
+    G_SND_BOILER_PIPE      = "braixssoundcollection/memes/metalpipe.wav"
+    G_SND_BOILER_WHISTLE   = "braixssoundcollection/memes/old_spice_whistle.wav"
+    
+    # Used for sound sources
+    holoCreate(1000, Base:toWorld(vec(-70,0,20)), vec(0.1))
+    holoParent(1000, Base)  
+    
+    holoCreate(1001, Base:toWorld(vec(75,0,-10)), vec(0.1))
+    holoParent(1001, Base) 
+     
+    holoCreate(1002, Base:toWorld(vec(-90,0,-20)), vec(0.1))
+    holoParent(1002, Base)
+
+    holoCreate(1003, Base:toWorld(vec(-58,0, 70)), vec(0.1))
+    holoParent(1003, Base)
+    
+    spriteSpawn(0, "sprites/light_glow01", Base:toWorld(vec(-70, 0, 18)), vec(255, 200, 100), 255, 1) 
+    spriteSetParent(0, Base) 
+    spriteEnable(0, 0)            
+    
+    # Variable init 
+    G_LastTime = curtime()   
+    G_FireBoxCoal = 0.5   
+    G_BoilerWater = 0.5
+    G_TankWater = G_TANKCAPACITY
+    G_BunkerCoal = 1.0
+    G_RegNotch = 0
+    G_DirNotch = 0
+    G_HBNotch = 0   
+    
+    G_UseSteamBrake = 0
+    G_BrakeMode = 0
+    G_SteamBrake = 0
+    G_SBNotch = 0
+    G_TrainBrake = 0
+    G_TBNotch = 0
+    G_MainReservoir = G_COMPRESSOR_MAX
+    G_EqualReservoir = G_COMPRESSOR_MIN
+    G_BrakePipe = G_COMPRESSOR_MIN
+    G_BrakeCylinder = 0
+    G_CompressorOn = 0
+    G_PrevBrakePipe = G_COMPRESSOR_MIN
+    G_WeldedEnts = array()
+    G_NextScan = 0
+    
+    G_BrakeMat = "friction_00" 
+    
+    entity():setMass(100) # leave this alone  
+}
+
+#ifdef particleCanCreate()
+function void emitParticle(Pos:vector, Vel:vector, Mat:string, SSize, ESize, SAlpha, EAlpha, Col:vector, Dur, Grav:vector, Bounce, Coll) 
+{
+    if (particleCanCreate()) 
+    {
+        particleSetPosition(Pos)
+        particleSetVelocity(Vel)
+        particleSetMaterial(Mat)
+        particleSetStartSize(SSize)
+        particleSetEndSize(ESize)
+        particleSetStartAlpha(SAlpha)
+        particleSetEndAlpha(EAlpha)
+        particleSetColor(Col)
+        particleSetDuration(Dur)
+        particleGravity(Grav)
+        particleBounce(Bounce)
+        particleCollision(Coll)
+        particleCreate()
+    }
+}
+
+function void emitParticle(Pos:vector, Vel:vector, Mats:array, SSize, ESize, SAlpha, EAlpha, Col:vector, Dur, Grav:vector, Bounce, Coll) 
+{
+    local N = Mats:count()
+    local Mat = (N > 0) ? Mats[randint(1, N), string] : "particles/smokey"
+    
+    if (Mat == "") { Mat = "particles/smokey" }
+    
+    emitParticle(Pos, Vel, Mat, SSize, ESize, SAlpha, EAlpha, Col, Dur, Grav, Bounce, Coll)
+}
+#endif
+
+function array startHold(Cur, Target)
+{
+    return array(1, 0, Cur, Target)
+}
+
+function string brakeModeName(Mode)
+{
+    if (Mode == 1) { return "STEAM BRAKE" }
+    if (Mode == 2) { return "TRAIN BRAKE" }
+    return "LOCO HANDBRAKE"
+}
+
+function void autoFireMan()
+{
+    # Kinda crappy but works
+    
+    if (!G_AUTO_FIREMAN) { return }
+    
+    local P = G_BoilerPressure
+    local Lo = 120
+    local Hi = 140
+    
+    if (G_FireBoxCoal < 0.50)  { G_AutoShoveling = 1 } 
+    if (G_FireBoxCoal >= 0.70) { G_AutoShoveling = 0 }
+    
+    local NeedCoal = G_AutoShoveling && (G_BunkerCoal > 0.01)
+    local NeedLight = !G_ToggleFire
+    local WantDoor = NeedLight || NeedCoal
+    
+    if (WantDoor) 
+    {
+        G_EasyDoorUntil = curtime() + 2 
+    }
+    
+    G_ToggleFireDoor = (WantDoor || curtime() < G_EasyDoorUntil) ? 1 : 0
+    
+    if (NeedLight && G_ToggleFireDoor)
+    {
+        G_ToggleFire = 1
+        spriteEnable(0, 1)
+    }
+    
+    G_ToggleAddCoal = (G_ToggleFireDoor && NeedCoal) ? 1 : 0
+    
+    if (G_BoilerWater < 0.4 && P > 40 && G_TankWater > 0.01) { G_WaterInjector = 1 }
+    if (G_BoilerWater > 0.7) { G_WaterInjector = 0 }
+    
+    G_BlowH[1, number] = 0
+    G_DampH[1, number] = 0
+    
+    if (P < Lo)
+    {
+        G_Damper = 1
+        G_Blower = 1
+    }
+    elseif (P > Hi)
+    {
+        G_Damper = 0.2
+        G_Blower = 0
+        
+        if (G_BoilerWater < 0.85 && P > 40 && G_TankWater > 0.01) { G_WaterInjector = 1 }
+    }
+    else
+    {
+        G_Damper = 0.55
+        G_Blower = 0
+    }
+}
+
+function void infiniteResources()
+{
+    if (!G_INFINITE_RESOURCES) { return }
+    
+    G_TankWater = G_TANKCAPACITY
+    G_BunkerCoal = 1
+}
+
+function number dirNextTarget(Cur, WantFwd)
+{
+    if (WantFwd) 
+    { 
+        return (Cur < -0.001) ? 0 : 1 
+    }
+    
+    return (Cur > 0.001) ? 0 : -1
+}
+
+function number easeHoldStep(Cur, H:array, Dur, DT, Lo, Hi)
+{
+    if (!H[1, number]) 
+    { 
+        return Cur 
+    }
+    
+    local HoldT = clamp(H[2, number] + DT, 0, Dur)
+    local U = HoldT / max(Dur, 0.001)
+    local Val = clamp(H[3, number] + (H[4, number] - H[3, number]) * (U * U), Lo, Hi)
+    H[2, number] = HoldT
+    
+    return Val
+}
+
+function number controlNotch(V)
+{
+    return round(V / 0.2)
+}
+
+function void playControlNotches(PrevNotch, CurNotch, MinIdx, MaxIdx, NotchSnd:string, EndSnd:string, NotchVol)
+{
+    if (PrevNotch == CurNotch) { return }
+    
+    local Step = (CurNotch > PrevNotch) ? 1 : -1
+    local N = PrevNotch
+    
+    while (N != CurNotch)
+    {
+        N += Step
+        holoEntity(1000):emitSound(NotchSnd, 60, 100, NotchVol)
+        
+        if ((N == MinIdx) || (N == MaxIdx))
+        {
+            holoEntity(1000):emitSound(EndSnd, 60, 90, 1)
+        }
+    }
+}
+
+function void safeSoundStop(Id:string)
+{
+    if (soundPlaying(Id)) { soundStop(Id) }
+}
+
+function void safeSoundVolume(Id:string, Vol)
+{
+    if (soundPlaying(Id)) { soundVolume(Id, clamp(Vol, 0, 1)) }
+}
+
+function void safeSoundPitch(Id:string, Pitch)
+{
+    if (soundPlaying(Id)) { soundPitch(Id, clamp(Pitch, 0, 255)) }
+}
+
+function number updateLoopSound(Ent:entity, Id:string, On, WasOn, Path:string, Level, Vol, Pitch)
+{
+    if (!On)
+    {
+        safeSoundStop(Id)
+        return 0
+    }
+    
+    if (!WasOn || !soundPlaying(Id))
+    {
+        Ent:soundPlay(Id, 0, Path)
+        if (soundPlaying(Id)) { soundLevel(Id, Level) }
+    }
+    
+    safeSoundVolume(Id, Vol)
+    safeSoundPitch(Id, Pitch)
+    return 1
+}
+
+function void playToggleSounds(DidChange, State, OnPath:string, OffPath:string)
+{
+    if (!DidChange) { return }
+    holoEntity(1000):emitSound(State ? OnPath : OffPath, 60, 100, 1)
+}
+
+event keyPressed(Player:entity, Key:string, Down:number, KeyBind:string)
+{
+    if (Player == Seat:driver() && Down)
+    {
+        if (Key == KEY_DIRECTION_FORWARD) { G_DirH  = startHold(G_Direction, dirNextTarget(G_Direction, 1)) }
+        if (Key == KEY_DIRECTION_REVERSE) { G_DirH  = startHold(G_Direction, dirNextTarget(G_Direction, 0)) }
+        if (Key == KEY_REGULATOR_OPEN)    { G_RegH  = startHold(G_Regulator, 1) }
+        if (Key == KEY_REGULATOR_SHUT)    { G_RegH  = startHold(G_Regulator, 0) }
+        if (Key == KEY_BLOWER_OPEN)       { G_BlowH = startHold(G_Blower, 1) }
+        if (Key == KEY_BLOWER_SHUT)       { G_BlowH = startHold(G_Blower, 0) }
+        if (Key == KEY_DAMPER_OPEN)       { G_DampH = startHold(G_Damper, 1) }
+        if (Key == KEY_DAMPER_SHUT)       { G_DampH = startHold(G_Damper, 0) }
+
+        if (Key == KEY_BRAKE_MODE || Key == KEY_BRAKE_MODE_ALT)
+        {
+            G_BrakeMode = (G_BrakeMode + 1) % 3
+            G_UseSteamBrake = (G_BrakeMode == 1)
+            G_HBH[1, number] = 0
+            G_SBH[1, number] = 0
+            G_TrainBrake = 0
+            print("Brake: " + brakeModeName(G_BrakeMode))
+        }
+        
+        if (Key == KEY_BRAKE_APPLY)
+        {
+            if (G_BrakeMode == 1) { G_SBH = startHold(G_SteamBrake, 1) }
+            elseif (G_BrakeMode == 2) { G_TrainBrake = clamp(G_TrainBrake + 1, -1, 1) }
+            else { G_HBH = startHold(G_Handbrake, 1) }
+        }
+        
+        if (Key == KEY_BRAKE_RELEASE)
+        {
+            if (G_BrakeMode == 1) { G_SBH = startHold(G_SteamBrake, 0) }
+            elseif (G_BrakeMode == 2) { G_TrainBrake = clamp(G_TrainBrake - 1, -1, 1) }
+            else { G_HBH = startHold(G_Handbrake, 0) }
+        }
+        
+        G_HDLT += (Key == KEY_HEADLIGHT_UP && G_HDLT < 2) - (Key == KEY_HEADLIGHT_DOWN && G_HDLT > -2) 
+        
+        G_WaterInjector = (Key == KEY_INJECTOR)       ? !G_WaterInjector : G_WaterInjector     
+        G_Blowdown      = (Key == KEY_BLOWDOWN)       ? !G_Blowdown      : G_Blowdown   
+        G_CylinderCocks = (Key == KEY_CYLINDER_COCKS) ? !G_CylinderCocks : G_CylinderCocks
+                        
+        G_ToggleFireDoor = (Key == KEY_FIRE_DOOR) ? !G_ToggleFireDoor : G_ToggleFireDoor 
+        G_ToggleAddCoal  = (Key == KEY_ADD_COAL) ? !G_ToggleAddCoal : G_ToggleAddCoal  
+                
+        if (Key == KEY_TOGGLE_FIRE)
+        {
+            if (G_ToggleFire)
+            {
+                G_ToggleFire = 0
+                spriteEnable(0, 0)                    
+            }
+            else
+            {
+                if (G_ToggleFireDoor)
+                {
+                    G_ToggleFire = 1
+                    spriteEnable(0, 1)                 
+                }
+            }
+        }
+                                    
+        G_Whistle = (Key == KEY_WHISTLE) ? 1 : G_Whistle
+        G_Whistle2 = (Key == KEY_WHISTLE2) ? 1 : G_Whistle2
+        #G_Bell = (Key == "g") ? !G_Bell : G_Bell                    
+    }
+    
+    if (Player == Seat:driver() && !Down)
+    {
+        if (Key == KEY_REGULATOR_OPEN || Key == KEY_REGULATOR_SHUT) { G_RegH[1, number] = 0 }
+        if (Key == KEY_DIRECTION_FORWARD || Key == KEY_DIRECTION_REVERSE) { G_DirH[1, number] = 0 }
+        if (Key == KEY_BLOWER_OPEN || Key == KEY_BLOWER_SHUT) { G_BlowH[1, number] = 0 }
+        if (Key == KEY_DAMPER_OPEN || Key == KEY_DAMPER_SHUT) { G_DampH[1, number] = 0 }
+        if (Key == KEY_BRAKE_APPLY || Key == KEY_BRAKE_RELEASE)
+        {
+            G_HBH[1, number] = 0
+            G_SBH[1, number] = 0
+        }
+        G_Whistle  = (Key == KEY_WHISTLE) ? 0 : G_Whistle
+        G_Whistle2 = (Key == KEY_WHISTLE2) ? 0 : G_Whistle2
+    }    
+}
+
+event tick() 
+{
+    G_Active = 1
+                   
+    if (G_Active) 
+    {
+        local HoldDT = tickInterval()
+        
+        G_Regulator = easeHoldStep(G_Regulator, G_RegH, 1.0, HoldDT, 0, 1)
+        G_Direction = easeHoldStep(G_Direction, G_DirH, 1.0, HoldDT, -1, 1)
+        
+        if (G_DirH[1, number] && (G_DirH[4, number] == 0) && (abs(G_Direction) < 0.02))
+        {
+            G_Direction = 0
+            G_DirH[1, number] = 0
+        }
+        
+        local RegN = controlNotch(G_Regulator)
+        
+        playControlNotches(
+            G_RegNotch, RegN, 0, 5, 
+            G_SND_CTRL_NOTCH, 
+            G_SND_CTRL_END, 0.5
+        )
+            
+        G_RegNotch = RegN
+        
+        local DirN = controlNotch(G_Direction)
+        
+        playControlNotches(
+            G_DirNotch, DirN, -5, 5, 
+            G_SND_CTRL_NOTCH, 
+            G_SND_CTRL_END, 0.5
+        )
+        
+        G_DirNotch = DirN
+        
+        G_Blower = easeHoldStep(G_Blower, G_BlowH, 1.0, HoldDT, 0, 1)
+        G_Damper = easeHoldStep(G_Damper, G_DampH, 1.0, HoldDT, 0, 1)
+        G_Handbrake = easeHoldStep(G_Handbrake, G_HBH, 1.0, HoldDT, 0, 1)
+        G_SteamBrake = easeHoldStep(G_SteamBrake, G_SBH, 1.0, HoldDT, 0, 1)
+        
+        local SBSubtracting = G_SteamBrake < G_SteamBrakePrev - 0.0001
+        local VentVol = clamp(max(G_SteamBrake, 0.05) * G_BoilerPressure / 100, 0.1, 0.8)
+        
+        if (SBSubtracting)
+        {
+            G_SBVentFadeT = 1.0
+            G_SBVentLiveVol = VentVol
+        }
+        elseif (G_SBVentFadeT > 0)
+        {
+            G_SBVentFadeT = max(0, G_SBVentFadeT - HoldDT)
+            VentVol = G_SBVentLiveVol * (G_SBVentFadeT / 1.0)
+        }
+        else
+        {
+            VentVol = 0
+        }
+        
+        G_LoopSBVentOn = updateLoopSound(
+            holoEntity(1000),
+            "steambreake_vent",
+            SBSubtracting || (G_SBVentFadeT > 0),
+            G_LoopSBVentOn,
+            G_SND_SB_VENT, 65, VentVol, 90
+        )
+        
+        G_SteamBrakePrev = G_SteamBrake
+        
+        local HBN = controlNotch(G_Handbrake)
+        playControlNotches(
+            G_HBNotch, HBN, 0, 5, 
+            G_SND_HB_RATCHET, 
+            G_SND_CTRL_END, 0.2
+        )
+        
+        G_HBNotch = HBN
+        
+        local SBN = controlNotch(G_SteamBrake)
+        playControlNotches(
+            G_SBNotch, SBN, 0, 5,
+            G_SND_CTRL_NOTCH,
+            G_SND_CTRL_END, 0.4
+        )
+        
+        G_SBNotch = SBN
+        
+        if (changed(G_TrainBrake))
+        {
+            playControlNotches(
+                G_TBNotch, G_TrainBrake, -1, 1,
+                G_SND_CTRL_NOTCH,
+                G_SND_CTRL_END, 0.4
+            )
+            
+            G_TBNotch = G_TrainBrake
+        }
+        
+        if(curtime() >= G_NextTick) 
+        {
+            G_DeltaTime = curtime() - G_LastTime
+            G_LastTime = curtime()
+            
+            #autoFireMan()
+            #infiniteResources()
+
+            # ======================================================
+            # Which direciton and Speed
+            # ======================================================
+                                            
+            local Velocity = entity():velL():z()
+            TravelDirection = sign(Velocity)
+            
+            G_MPH = toUnit("mph", abs(Velocity))
+                
+            # ======================================================
+            #  CAR COUNTING
+            # ======================================================
+
+            if (curtime() >= G_NextScan)
+            {
+                G_WeldedEnts = array()
+                local Tmp = entity():getConstraints()
+                local PropCount = 0
+                G_CarCount = 0
+                
+                for (I = 1, Tmp:count())
+                {
+                    local E = Tmp[I, entity]
+                    if (E:isValid() & E:mass() >= 1000)
+                    {
+                        G_WeldedEnts:pushEntity(E)
+                        PropCount++
+                        
+                        if (PropCount % 3 == 0)
+                        {
+                            G_CarCount++
+                        }
+                    }
+                }
+                
+                G_NextScan = curtime() + 5
+            }
+ 
+            # ======================================================
+            # LOCO BRAKE
+            # ======================================================
+                           
+            local HB_Force = G_Handbrake * G_HANDBRAKE_FORCE
+            local SB_Force = G_SteamBrake * (G_BoilerPressure / 100) * G_STEAM_BRAKE_FORCE 
+            local LocoBrakeForce = max(HB_Force, SB_Force)
+            
+            # ======================================================
+            #  TRAIN BRAKE
+            # ======================================================
+                                            
+            if (G_MainReservoir < G_COMPRESSOR_MIN && !G_CompressorOn) 
+            {
+                G_CompressorOn = 1       
+                Base:emitSound(G_SND_COMPRESSOR, 65, 100, 0.5)   
+            }
+    
+            if (G_MainReservoir >= G_COMPRESSOR_MAX && G_CompressorOn) 
+            {
+                G_CompressorOn = 0       
+                Base:emitSoundStop(G_SND_COMPRESSOR)                                  
+            }        
+            
+            local FlowRateCompressor = 0.05 / max(G_CarCount * 0.5, 1)
+            
+            local BPRising = (G_BrakePipe - G_PrevBrakePipe) >= 0.1
+            G_PrevBrakePipe = G_BrakePipe
+                    
+            local CompressorLeak = BPRising ? 0.1 : 0.01 + (G_CarCount * 0.002)
+                  
+            G_MainReservoir += G_CompressorOn ? FlowRateCompressor : -CompressorLeak
+            
+            local FlowRate = 2 / max(G_CarCount, 1)
+            local FeedP = G_COMPRESSOR_MIN
+            local FullServiceP = FeedP - G_AIR_SERVICE_DROP
+            
+            if (G_MainReservoir < FullServiceP)
+            {
+                G_EqualReservoir = G_MainReservoir
+                G_BrakePipe = G_MainReservoir
+            }
+            else
+            {
+                if (G_TrainBrake > 0)
+                {
+                    G_EqualReservoir = max(FullServiceP, G_EqualReservoir - FlowRate)
+                }
+                elseif (G_TrainBrake < 0)
+                {
+                    G_EqualReservoir = min(FeedP, G_EqualReservoir + FlowRate)
+                }
+                
+                G_BrakePipe += clamp(G_EqualReservoir - G_BrakePipe, -2, FlowRate)
+            }        
+       
+            local PipeDrop = min(G_MainReservoir, FeedP) - G_BrakePipe
+            local BCRaw = PipeDrop / G_AIR_SERVICE_DROP * G_AIR_BC_MAX
+            
+            G_BrakeCylinder = clamp(BCRaw, 0, G_AIR_BC_MAX)
+            
+            local BCFrac = G_BrakeCylinder / G_AIR_BC_MAX
+            
+            local TrainBrakeForce = BCFrac * G_TRAINBRAKE_FORCE_PER_CAR * G_CarCount 
+            local TrainBrakeLocoForce = BCFrac * G_TRAINBRAKE_LOCO_FORCE
+                   
+            # ======================================================
+            #  BRAKEFORCE SUM
+            # ======================================================
+                        
+            G_BrakeForce = LocoBrakeForce + TrainBrakeForce + TrainBrakeLocoForce
+ 
+            # ======================================================
+            #  BRAKE PHYSICAL MATERIAL
+            # ======================================================
+                               
+            G_BrakeMat = G_BrakeForce > 1 && G_MPH <= 1 ? "phx_tire_normal" : "friction_00"
+                         
+            if (G_BrakeMat != G_LastMat || changed(G_Handbrake) || changed(G_SteamBrake) || changed(G_ParkHolding))
+            {
+                for (I = 1, G_WeldedEnts:count())
+                {
+                    local E = G_WeldedEnts[I, entity]
+                    if (E:isValid())
+                    {
+                        E:propPhysicalMaterial(G_BrakeMat)
+                        E:propDrag(G_BrakeMat == "friction_00" ? 0 : 1)
+                    }
+                }
+                G_LastMat = G_BrakeMat
+            }                                   
+
+            # ======================================================
+            #  PRE-CONFIG
+            # ======================================================
+            
+            local TimeScale = 1
+            local DT = G_DeltaTime * TimeScale
+            
+            G_Cutoff = abs(G_Direction)
+
+            local SpeedNorm = clamp(G_MPH / G_MPH_MAX, 0, 1)
+            local CutoffSteam = G_Cutoff
+            local CutoffTE = G_Cutoff + (1 - G_Cutoff) * G_LINK_EXPANSION * SpeedNorm
+            
+            G_WaterInjector = (G_BoilerPressure > 40 && G_TankWater > 0.001) ? G_WaterInjector : 0
+            
+            local MaxPressure = 150
+            G_Pnorm = G_BoilerPressure / MaxPressure 
+            
+            # ======================================================
+            #  COAL as Fuel source
+            # ======================================================
+            
+            local FirebedCap = 1.0 
+            local BurnRate = 1 / 600
+
+            G_ToggleAddCoal = G_ToggleFireDoor && G_FireBoxCoal < FirebedCap && G_BunkerCoal > 0.001 ? G_ToggleAddCoal : 0
+            
+            local Scoop = G_ToggleAddCoal ? 0.002 : 0
+            Scoop = min(Scoop, G_BunkerCoal * G_COALCAPACITY, FirebedCap - G_FireBoxCoal)
+            
+            G_BunkerCoal -= Scoop / G_COALCAPACITY
+            G_FireBoxCoal += Scoop
+            G_AddCoal = Scoop
+            G_BunkerCoal = clamp(G_BunkerCoal, 0, 1)
+
+            if (G_CoalFill)
+            {
+                G_BunkerCoal += (1 / 30) * DT
+            }
+            
+            G_BunkerCoal = clamp(G_BunkerCoal, 0, 1)
+            
+            # ======================================================
+            #  Let there be FIRE, EXHAUST and COAL chewing
+            # ======================================================
+
+            local Exhaust = G_Regulator * CutoffSteam * (0.3 + 0.7 * G_MPH / G_MPH_MAX) * G_Pnorm
+            G_BlowerEffect = G_Blower * clamp(G_BoilerPressure / 30, 0, 1)
+            local Natural = 0.15 * G_Fire 
+                                                
+            G_Draught = max(G_BlowerEffect, Exhaust, Natural)
+           
+            local Air = G_Damper * (0.25 + 0.75 * G_Draught)
+            
+            local Bed = G_FireBoxCoal / FirebedCap
+            local BedFactor = (Bed <= 0.7) ? (Bed / 0.7) : (1.0 - (Bed - 0.7) / 0.3 * 0.5)
+            G_Fire = G_ToggleFire ? BedFactor * Air : 0
+            
+            G_FireBoxCoal -= BurnRate * G_Fire * DT
+            G_FireBoxCoal = clamp(G_FireBoxCoal, 0, FirebedCap)
+
+            # ======================================================
+            #  STEAM GENERATION
+            # ======================================================    
+                  
+            local Over = max(0, G_BoilerPressure - MaxPressure)
+            G_SafetyFlow = (G_BoilerPressure >= MaxPressure) ? clamp(0.35 + Over * 0.05, 0.35, 1) : 0
+                        
+            local Rate = 1.0
+
+            local SteamGen = G_BoilerWater > 0 ? G_Fire * 1.2 : 0
+            
+            local SpeedSteam = 0.4 + 0.6 * G_MPH / G_MPH_MAX
+            local CylUse = G_Regulator * CutoffSteam * SpeedSteam * G_Pnorm
+            local InjUse = G_WaterInjector * 0.15 * G_Pnorm
+            local BrakeUse = G_SteamBrake * 0.08 * G_Pnorm
+            local IdleUse = 0.02 * G_Pnorm
+            
+            local SteamUse = CylUse + InjUse + G_SafetyFlow + BrakeUse + IdleUse
+
+            G_BoilerPressure += (SteamGen - SteamUse) * Rate * DT / G_BOILERVOLUME
+            G_BoilerPressure = clamp(G_BoilerPressure, 0, MaxPressure)   
+            
+            # ======================================================
+            #  BLOWDOWN
+            # ======================================================    
+            
+            local BlowdownSteam = 1.2
+            local BlowFlow = (G_Blowdown > 0 && G_BoilerPressure > 5 && G_BoilerWater > 0) ? G_Blowdown * G_Pnorm : 0
+            SteamUse += BlowFlow * BlowdownSteam
+                        
+            # ======================================================
+            #  WATER The source of life
+            # ======================================================
+            
+            local WaterMax = 1.0
+            local TankMax = G_TANKCAPACITY
+            local InjectorFeedRate = 0.05
+            local WaterOutRate = 0.04
+            local BlowdownRate = 0.025
+            local TankFillRate = TankMax / 30
+            
+            local WaterOut = (SteamUse - IdleUse) * WaterOutRate * G_WATER_USE_MUL * DT
+            local WaterIn = (G_WaterInjector && G_TankWater > 0) ? InjectorFeedRate * DT : 0
+            
+            WaterIn = min(WaterIn, G_TankWater)
+            
+            G_TankWater -= WaterIn
+            G_BoilerWater += WaterIn - WaterOut
+            G_BoilerWater -= BlowFlow * BlowdownRate * G_WATER_USE_MUL * DT
+            
+            G_TankWater += G_TankFill ? TankFillRate * DT : 0
+            
+            G_BoilerWater = clamp(G_BoilerWater, 0, WaterMax)
+            G_TankWater = clamp(G_TankWater, 0, TankMax)
+                 
+            # ======================================================
+            #  TRACTIVE EFFORT GENERATION
+            # ======================================================
+            
+            local TE_cyl = G_EFFICIENCY * G_BoilerPressure * G_CYLINDERDIAMETER ^ 2 * G_PISTONSTROKE / G_WHEELSIZE
+            local SpeedCurve = max(0, 1 - G_MPH / G_MPH_MAX)   
+            
+            TE_cyl = TE_cyl * G_Regulator * CutoffTE * SpeedCurve
+                   
+            local TE_adh = G_ADHESION * G_WEIGHT
+            
+            G_TE = min(TE_cyl, TE_adh)
+ 
+            # ==============================================================
+            #  FORCE SUM
+            # ==============================================================
+                
+            local BrakeF = (G_BrakeMat == "phx_tire_normal") ? 0 : G_BrakeForce * 175 * G_BRAKE_MUL
+            
+            BrakingEffort = G_MPH > 1 ? BrakeF * TravelDirection : 0       
+                    
+            local F = G_TE * 175 * G_Direction * G_THROTTLE_MUL
+                    
+            G_NetForce = G_BrakeMat == "phx_tire_normal" ? 0 : (F - BrakingEffort)   
+                                    
+            # ==============================================================
+            #  SOUND EFFECTS & And some stupid sprite scale
+            # ==============================================================   
+        
+            spriteSetScale(0, 0.01 + G_Fire) 
+                       
+            G_LoopRollingOn = updateLoopSound(
+                Base, 
+                "rolling", 
+                G_MPH > 1, 
+                G_LoopRollingOn, 
+                G_SND_ROLLING, 85, clamp(-0.1 + G_MPH * 0.2, 0, 1), 50 + G_MPH * 1.5
+            )
+            
+            G_LoopRolling2On = updateLoopSound(
+                Base, 
+                "rolling2", 
+                G_MPH > 1, 
+                G_LoopRolling2On, 
+                G_SND_ROLLING2, 75, clamp(-1.0 + G_MPH * 0.1, 0, 1), 50 + G_MPH * 1.5
+            )
+                        
+            G_LoopBrakingOn = updateLoopSound(
+                Base, 
+                "braking", 
+                G_MPH > 1 && G_BrakeForce > 1, 
+                G_LoopBrakingOn, 
+                G_SND_BRAKE_SQUEAL, 75, clamp(min(G_MPH * 0.5, max(G_BrakeForce, 1) / G_STEAM_BRAKE_FORCE) * 0.2, 0, 1), 100
+            )
+                        
+            playToggleSounds(
+                changed(G_ToggleFire), 
+                G_ToggleFire, 
+                G_SND_FIRE_LIGHT, 
+                G_SND_FIRE_OUT
+            )
+            
+            playToggleSounds(
+                changed(G_BrakeMode),
+                G_BrakeMode != 0,
+                G_SND_CTRL_END,
+                G_SND_HB_RATCHET
+            )
+            
+            playToggleSounds(
+                changed(G_ToggleFireDoor), 
+                G_ToggleFireDoor, 
+                G_SND_FIREBOX_OPEN, 
+                G_SND_FIREBOX_CLOSE
+            )
+            
+            if (changed(G_ToggleAddCoal) && G_ToggleAddCoal && G_ToggleFireDoor)
+            {
+                holoEntity(1000):emitSound(G_SND_COAL_SHOVEL, 60, 100, 1)
+            }
+
+            if ((changed(G_ToggleAddCoal) && !G_ToggleAddCoal) || (changed(G_ToggleFireDoor) && !G_ToggleFireDoor))
+            {
+                holoEntity(1000):emitSoundStop(G_SND_COAL_SHOVEL)
+            }
+
+            if (changed(G_ToggleAddCoal) && !G_ToggleAddCoal)
+            {
+                holoEntity(1000):emitSound(G_SND_SHOVEL_HIT, 60, 100, 1)
+            }
+                                             
+            if (G_SafetyFlow) 
+            {
+                G_SafetyNominal = 1
+                G_SafetyHoldUntil = curtime() + 0.4
+            }
+            
+            if (curtime() > G_SafetyHoldUntil) 
+            {
+                G_SafetyNominal = 0
+            }
+
+            G_LoopSafetyOn = updateLoopSound(            
+                holoEntity(1003), 
+                "SafetySteam", 
+                G_SafetyNominal, 
+                G_LoopSafetyOn,           
+                G_SND_SAFETY, 75, clamp(G_SafetyFlow * 0.2, 0, 0.2), 100
+            )
+            
+            G_LoopBlowerOn = updateLoopSound(
+                holoEntity(1000), 
+                "BlowerHiss", 
+                G_BlowerEffect > 0 && G_BoilerPressure > 1, 
+                G_LoopBlowerOn, 
+                G_SND_BLOWER, 60, clamp(G_Blower * G_Pnorm * 0.25, 0, 0.25), clamp(100 * G_Pnorm, 25, 100)
+            )
+            
+            G_LoopInjectorOn = updateLoopSound(
+                holoEntity(1000), 
+                "InjectorHiss", 
+                G_WaterInjector && G_BoilerPressure > 1, 
+                G_LoopInjectorOn, 
+                G_SND_INJECTOR, 60, clamp(G_WaterInjector * G_Pnorm * 0.5, 0, 0.5), clamp(100 * G_Pnorm, 50, 100)
+            )
+            
+            G_LoopDraughtOn = updateLoopSound(
+                holoEntity(1001), 
+                "Draught", 
+                G_Draught > 0, 
+                G_LoopDraughtOn, 
+                G_SND_DRAUGHT, 65, clamp(G_Draught * 0.5, 0, 0.5), clamp(120 * G_Draught, 50, 100)
+            )
+           
+            if (changed(G_Blowdown) && G_Blowdown && (G_BoilerPressure > 5))
+            {
+                holoEntity(1002):soundPlay("Blowdown", 0, G_SND_BLOWDOWN)
+            }
+            
+            if (G_Blowdown && (G_BoilerPressure > 5)) 
+            {
+                safeSoundVolume("Blowdown", clamp(G_Blowdown * G_Pnorm, 0, 1))
+            }
+                              
+            if (changed(G_Blowdown) && !G_Blowdown && (G_BoilerPressure > 5))
+            {
+                holoEntity(1002):soundPlay("Blowdown", 0, G_SND_BLOWDOWN_END)
+            }
+
+            local FireState = G_ToggleFire ? clamp(floor(G_Fire * 3) + 1, 1, 3) : 0
+            
+            if (changed(FireState) && FireState)
+            {               
+                local Sound = select(FireState,
+                    G_SND_FIRE_SMALL,
+                    G_SND_FIRE_MED,
+                    G_SND_FIRE_BIG
+                )
+                    
+                holoEntity(1000):soundPlay("Fire", 0, Sound)
+                soundLevel("Fire", 60)
+                
+                holoEntity(1000):soundPlay("FireWind", 0, G_SND_FIRE_WIND)               
+                soundLevel("FireWind", 60)                
+            }
+            
+            if (FireState)
+            {
+                safeSoundVolume("Fire", max(G_Fire * max(G_ToggleFireDoor * 0.5, 0.2), 0.2 * max(G_ToggleFireDoor * 0.5, 0.2)))
+                safeSoundVolume("FireWind", clamp(G_Fire, 0, max(G_ToggleFireDoor * 0.5, 0.3)))
+                safeSoundPitch("FireWind", clamp(120 * G_Fire, 50, 120))                 
+            }
+
+            if (changed(FireState) && !FireState)
+            {
+                safeSoundStop("Fire")
+                safeSoundStop("FireWind")
+            }      
+                             
+            # ==============================================================
+            #  BOILER EXPLOSION
+            # ============================================================== 
+                       
+            local Dry = (G_BoilerWater <= 0) && (G_Fire > 0.05)
+            
+            if (Dry) 
+            {
+                G_CrownDamage += G_Fire * (0.1 + 0.1 * G_Pnorm) * G_DeltaTime
+            }
+
+            if (changed(G_WaterInjector) && G_WaterInjector && Dry && (G_CrownDamage > 0.15)) 
+            {
+                G_CrownDamage += 0.1 + 0.2 * G_Fire 
+            }
+            
+            G_CrownDamage = clamp(G_CrownDamage, 0, 1)
+            
+            local BoilerSoftenState = clamp(floor(G_CrownDamage * 8) + 1, 1, 8)
+            
+            if (changed(BoilerSoftenState) && BoilerSoftenState)
+            {
+                Base:emitSound(G_SND_CROWN[BoilerSoftenState, string], 70, 70, 1)
+            }
+            
+            local BoilerExplosion = G_CrownDamage >= 1
+            
+            G_BoilerExplosionForce = 0
+            
+            if (changed(BoilerExplosion) && BoilerExplosion)
+            {                             
+                Base:emitSound(G_SND_BOILER_WARN, 140, 100, 1)  
+                                                                                                        
+                timer(0.75, function() 
+                {                 
+                    G_BoilerExplosion = 1
+                    G_BoilerExplosionForce = 1
+                    G_ParticleEffect = "rd_robot_explosion"
+                    
+                    Base:emitSound(G_SND_BOILER_BLAST, 140, 100, 1)          
+                    Base:emitSound(G_SND_BOILER_PIPE, 140, 100, 0.5)                       
+                })
+
+                timer(1, function() 
+                {
+                    G_ParticleEffect = "rd_robot_explosion_bits"
+                })
+
+                timer(1.4, function() 
+                {
+                    G_ParticleEffect = "building_explosion"
+                })                                                
+                
+                timer(4.75, function() 
+                {
+                    Base:emitSound(G_SND_BOILER_WHISTLE,  140, 100, 1)
+                })  
+                
+                timer(8, function() 
+                {
+                    assert(0, "FAILURE STATE: BOILER EXPLOSION")
+                })                                                                                                       
+            }
+            
+            G_NextTick = curtime() + 0.1                         
+        }
+            
+        # ==============================================================
+        #  STEAM CHUG PULSE
+        # ==============================================================
+                        
+        local ChuffsPerRev = 4
+        local ChuffIdx = floor(G_WheelAng * 4) % 4
+        local WantPulse = (ChuffIdx != G_LastChuffIdx)
+            
+        G_LastChuffIdx = ChuffIdx                
+        G_SteamChugPulse = G_SteamChugloop ? 1 : 0
+            
+        if (WantPulse && curtime() >= G_NextChugTime)
+        {
+            G_SteamChugPulse = 1
+            G_NextChugTime = curtime() + 0.1
+        }
+
+        # ==============================================================
+        #  STEAM CHUG SOUND SYSTEM
+        # ==============================================================
+            
+        local WheelRPM = (G_MPH * 1056) / (pi() * G_WHEELSIZE)
+        local RpmRangeCount = G_LOCO_SOUND_RPM_RANGES:count()
+            
+        local FirstRPM = G_LOCO_RPM_RANGES[1, number]
+        local Work = clamp(G_Regulator * abs(G_Cutoff), 0, 1)
+            
+        local SoftVol = Work * 2
+        local HardVol = Work
+            
+        local VolSoftAdjust = 0.5
+        local VolHardAdjust = 1.0            
+  
+        G_SteamChugloop = (WheelRPM >= FirstRPM) 
+
+        local Band = 1
+        
+        if (G_SteamChugloop) 
+        {
+            Band = RpmRangeCount
+            local I = 1
+                
+            while (I < RpmRangeCount) 
+            {
+                if (WheelRPM < G_LOCO_RPM_RANGES[I + 1, number]) 
+                {
+                    Band = I
+                    I = RpmRangeCount
+                }
+                else 
+                { 
+                    I++ 
+                }
+            }
+        }
+        
+        local ChugLoopRise = G_SteamChugloop && !G_WasSteamChugloop
+        local ChugLoopFall = !G_SteamChugloop && G_WasSteamChugloop
+        local ChugPulseRise = G_SteamChugPulse && !G_WasSteamChugPulse
+                
+        if (ChugPulseRise && !G_SteamChugloop) 
+        {
+            G_ChugSoundIndex = G_ChugSoundIndex % G_LOCO_SOUND_CHUG_SINGLES:count() + 1
+            local File = G_LOCO_SOUND_CHUG_SINGLES[G_ChugSoundIndex, string]
+                
+            Base:emitSoundStop(G_ChugSndSoft)
+            Base:emitSoundStop(G_ChugSndHard)
+                
+            G_ChugSndSoft = G_LOCO_SOUND_ROOT_DIR + "/" + G_LOCO_SOUND_SOFT_TYPE + "/" + File
+            G_ChugSndHard = G_LOCO_SOUND_ROOT_DIR + "/" + G_LOCO_SOUND_HARD_TYPE + "/" + File
+                
+            if (SoftVol > 0.02) 
+            {
+                holoEntity(1001):emitSound(G_ChugSndSoft, 75, 100, SoftVol) 
+            }
+                
+            if (HardVol > 0.02) 
+            { 
+                holoEntity(1001):emitSound(G_ChugSndHard, 75, 100, HardVol) 
+            }
+        }
+
+        local ThisRPM = G_LOCO_RPM_RANGES[Band, number]
+        local NextBand = clamp(Band + 1, 1, G_LOCO_RPM_RANGES:count())
+        local NextRPM = G_LOCO_RPM_RANGES[NextBand, number]
+        local T = 0
+            
+        if (NextBand > Band) 
+        {
+            T = clamp((WheelRPM - ThisRPM) / max(NextRPM - ThisRPM, 0.01), 0, 1)
+        }
+
+        local VolThis = 1 - T
+        local VolNext = T
+            
+        local PitchThis = clamp(100 * WheelRPM / ThisRPM, 50, 250)
+        local PitchNext = clamp(100 * WheelRPM / NextRPM, 50, 250)
+            
+        local SoftThis = G_LOCO_SOUND_ROOT_DIR + "/" + G_LOCO_SOUND_SOFT_TYPE + "/" + G_LOCO_SOUND_RPM_RANGES[Band, string]
+        local HardThis = G_LOCO_SOUND_ROOT_DIR + "/" + G_LOCO_SOUND_HARD_TYPE + "/" + G_LOCO_SOUND_RPM_RANGES[Band, string]
+        local SoftNext = G_LOCO_SOUND_ROOT_DIR + "/" + G_LOCO_SOUND_SOFT_TYPE + "/" + G_LOCO_SOUND_RPM_RANGES[NextBand, string]
+        local HardNext = G_LOCO_SOUND_ROOT_DIR + "/" + G_LOCO_SOUND_HARD_TYPE + "/" + G_LOCO_SOUND_RPM_RANGES[NextBand, string]
+
+        local SwitchInterval = 0.4
+            
+        if (ChugLoopRise) 
+        {
+            holoEntity(1001):soundPlay("chugsoftA", 0, SoftThis)
+            holoEntity(1001):soundPlay("chughardA", 0, HardThis)
+            holoEntity(1001):soundPlay("chugsoftB", 0, SoftNext)
+            holoEntity(1001):soundPlay("chughardB", 0, HardNext)
+            G_LoopBand = Band
+            G_NextBand = NextBand
+            G_NextChugSwitch = curtime() + SwitchInterval
+        }
+            
+        if (ChugLoopFall) 
+        {
+            safeSoundStop("chugsoftA")
+            safeSoundStop("chughardA")
+            safeSoundStop("chugsoftB")
+            safeSoundStop("chughardB")
+        }
+
+        if (G_SteamChugloop && !ChugLoopRise && ((Band != G_LoopBand) || (NextBand != G_NextBand)) && (curtime() >= G_NextChugSwitch)) 
+        {
+            safeSoundStop("chugsoftA")
+            safeSoundStop("chughardA")
+            safeSoundStop("chugsoftB")
+            safeSoundStop("chughardB")
+            holoEntity(1001):soundPlay("chugsoftA", 0, SoftThis)
+            holoEntity(1001):soundPlay("chughardA", 0, HardThis)
+            holoEntity(1001):soundPlay("chugsoftB", 0, SoftNext)
+            holoEntity(1001):soundPlay("chughardB", 0, HardNext)
+            G_LoopBand = Band
+            G_NextBand = NextBand
+            G_NextChugSwitch = curtime() + SwitchInterval
+        }
+            
+        if (G_SteamChugloop) 
+        {
+            safeSoundPitch("chugsoftA", PitchThis)
+            safeSoundPitch("chughardA", PitchThis)
+            safeSoundPitch("chugsoftB", PitchNext)
+            safeSoundPitch("chughardB", PitchNext)
+            safeSoundVolume("chugsoftA", (SoftVol * VolThis) * VolSoftAdjust)
+            safeSoundVolume("chughardA", (HardVol * VolThis) * VolHardAdjust)
+            safeSoundVolume("chugsoftB", (SoftVol * VolNext) * VolSoftAdjust)
+            safeSoundVolume("chughardB", (HardVol * VolNext) * VolHardAdjust)               
+        }
+        
+        G_WasSteamChugloop = G_SteamChugloop ? 1 : 0
+        G_WasSteamChugPulse = G_SteamChugPulse ? 1 : 0
+        
+        # ==============================================================
+        #  EXHAUST SMOKE
+        # ==============================================================
+        
+        local SmokeMats = array(
+            "particle/smokesprites_0001",
+            "particle/smokesprites_0002",
+            "particle/smokesprites_0003",
+            "particle/smokesprites_0004",
+            "particle/smokesprites_0005"
+        )
+            
+        local ExhaustPulse = G_Regulator * G_Cutoff * G_SteamChugPulse * (0.3 + 0.7 * G_MPH / G_MPH_MAX)                                              
+                                
+        local SmokeAmt = clamp(G_Fire * (0.5 + 0.5 * G_FireBoxCoal), 0, 1)
+        
+        SmokeAmt = SmokeAmt * (0.35 + 0.65 * G_Draught)  
+        SmokeAmt = SmokeAmt + 10 * ExhaustPulse * G_Fire 
+        SmokeAmt = clamp(SmokeAmt, 0, 1)
+        
+        local Dirt = clamp(0.25 + 0.55 * (1 - G_Pnorm) ^ 0.5 + 0.25 * (1 - G_Draught) ^ 1.5, 0.2, 1)
+        
+        if (SmokeAmt > 0.02) 
+        {
+            local Speed = 25 + 70 * G_Draught ^ 1.2 + 25 * SmokeAmt
+            
+            G_SmokeSwing = G_SmokeSwing + tickInterval() * 15
+            local Swing = sin(G_SmokeSwing)
+            local Sway = cos(G_SmokeSwing)
+            
+            local StackBase = Base:toWorld(G_FX_POS_STACK)
+            local SideDir = Base:toWorld(G_FX_POS_STACK + vec(0, 1, 0)) - StackBase
+            local ForeDir = Base:toWorld(G_FX_POS_STACK + vec(1, 0, 0)) - StackBase
+            
+            local VelSwing = 10
+            local SpreadAmt = 18 + 12 * (1 - G_Draught)
+            local RandSpread = (randvec() - vec(0.5, 0.5, 0.5)) * SpreadAmt
+            local StackPos = StackBase
+            local Vel = Base:up() * Speed + SideDir * (Swing * VelSwing) + ForeDir * (Sway * VelSwing * 0.4) + RandSpread
+            
+            local Col = vec(40, 40, 40) * Dirt + vec(160, 160, 160) * (1 - Dirt)
+            local SSize = clamp(G_FX_STACK_SSIZE + G_FX_STACK_SSIZE_GAIN * SmokeAmt, G_FX_STACK_SSIZE, 12)
+            local ESize = clamp(SSize * (2 + Dirt) * G_FX_STACK_ESIZE_MUL, 4, 120)
+            local SAlpha = clamp(150 * SmokeAmt * (0.5 + 0.5 * Dirt) * G_FX_STACK_ALPHA, 20, 255)
+            local Dur = 1.5 + SmokeAmt * 2 + 2.5 * Dirt 
+            local Grav = vec(0, 0, 2)
+            
+            emitParticle(StackPos, Vel, SmokeMats, SSize, ESize, SAlpha, 0, Col, Dur, Grav, 0, 0)
+        }
+
+        # ==============================================================
+        #  STEAM JETS
+        # ==============================================================
+    
+        if (G_SafetyFlow > 0.01) 
+        {
+            local JetPos = Base:toWorld(G_FX_POS_SAFETY) 
+            local Speed = 16 + 48 * G_SafetyFlow
+            local Spread = (randvec() - vec(0.5,0.5,0.5)) * (8 + 6 * G_SafetyFlow)
+            local Vel = Base:up() * Speed + Spread
+            local Col = vec(220, 220, 220)            
+            local SSize = (G_FX_SAFETY_SSIZE + G_FX_SAFETY_SSIZE_GAIN * G_SafetyFlow) * G_FX_SAFETY_SSIZE_MUL
+            local ESize = SSize * (G_FX_SAFETY_ESIZE_MUL + G_SafetyFlow)
+            local SAlpha = clamp(G_FX_SAFETY_ALPHA * G_SafetyFlow, 0, 255)
+            local Dur = 0.6 + 2 * G_SafetyFlow        
+            local Grav = vec(0, 0, 1)
+            
+            emitParticle(JetPos, Vel + (randvec() - vec(0.5, 0.5, 0.5)) * 5, SmokeMats, SSize, ESize, SAlpha, 0, Col, Dur, Grav, 0, 0)
+        }       
+        
+        if (G_CylinderCocks && G_Regulator > 0.05 && G_BoilerPressure > 5) 
+        {
+            local Flow = G_Regulator * G_Pnorm
+            local Speed = 30 + 40 * Flow
+            local Spread = (randvec() - vec(0.5, 0.5, 0.5)) * 10
+
+            local OutL = Base:forward() * -0.3 + Base:right() * 1 + Base:up() * -0.1
+            local OutR = Base:forward() * -0.3 + Base:right() * -1 + Base:up() * -0.1
+            local VelL = OutL:normalized() * Speed + Spread
+            local VelR = OutR:normalized() * Speed + Spread
+            
+            local ChuffIdx = floor(G_WheelAng * ChuffsPerRev) % 4
+            local PulseL = G_SteamChugPulse && (ChuffIdx == 0 || ChuffIdx == 2)
+            local PulseR = G_SteamChugPulse && (ChuffIdx == 1 || ChuffIdx == 3)
+
+            local LPos = Base:toWorld(G_FX_POS_COCK_L)
+            local RPos = Base:toWorld(G_FX_POS_COCK_R)
+            local Col = vec(200, 200, 200)
+            local SSize = G_FX_COCK_SSIZE + G_FX_COCK_SSIZE_GAIN * Flow
+            local ESize = SSize * G_FX_COCK_ESIZE_MUL
+            local SAlpha = clamp(G_FX_COCK_ALPHA * Flow, 0, 220)
+            local Dur = 0.4 + 1 * Flow
+            local Grav = vec(0, 0, -5)
+
+            if (PulseL) 
+            {
+                emitParticle(LPos, VelL, SmokeMats, SSize, ESize, SAlpha, 0, Col, Dur, Grav, 0, 0)                
+            }
+            
+            if (PulseR) 
+            {
+                emitParticle(RPos, VelR, SmokeMats, SSize, ESize, SAlpha, 0, Col, Dur, Grav, 0, 0)
+            }
+        }
+
+        if (G_Blowdown && G_BoilerPressure > 5 && G_BoilerWater > 0) 
+        {
+            local Flow = G_Blowdown * G_Pnorm
+            local JetPos = Base:toWorld(G_FX_POS_BLOWDOWN)
+            local JetSpeed = 50 + 100 * Flow
+            local Spread = (randvec() - vec(0.5, 0.5, 0.5)) * (12 + 10 * Flow)
+            local Col = vec(210, 210, 210)           
+            local SSize = G_FX_BLOW_SSIZE
+            local ESize = SSize * (G_FX_BLOW_ESIZE_MUL + Flow)
+            local SAlpha = clamp(G_FX_BLOW_ALPHA * Flow, 0, 255)
+            local Dur = 0.5 + 6 * Flow              
+            local Grav = vec(0, 0, -16)               
+            local Out = (-Base:forward() * 1.0 - Base:up() * 1.0 - Base:right() * -0.2):normalized()
+            local JetVel = Out * JetSpeed + Spread
+            
+            emitParticle(JetPos, JetVel, SmokeMats, SSize, ESize, SAlpha, 0, Col, Dur, Grav, 0.3, 1)
+        }
+        
+        if ((SBSubtracting || G_SBVentFadeT > 0) && G_BoilerPressure > 5)
+        {
+            local Flow = clamp(VentVol, 0.05, 1)
+            local JetPos = Base:toWorld(G_FX_POS_SBVENT)
+            local Spread = (randvec() - vec(0.5, 0.5, 0.5)) * (12 + 10 * Flow)
+            local Col = vec(210, 210, 210)
+            local SSize = G_FX_SBVENT_SSIZE
+            local ESize = SSize * (G_FX_SBVENT_ESIZE_MUL + Flow)
+            local SAlpha = clamp(G_FX_SBVENT_ALPHA * Flow, 0, 255)
+            local Dur = 0.5 + 2 * Flow
+            local Grav = vec(0, 0, -16)
+            local JetSpeed = 50 + 100 * Flow
+            local Out = (-Base:forward() * 1.0 - Base:up() * 1.0):normalized()
+            local JetVel = Out * JetSpeed + Spread
+            
+            emitParticle(JetPos, JetVel, SmokeMats, SSize, ESize, SAlpha, 0, Col, Dur, Grav, 0.3, 1)
+        }
+                                                    
+        # ======================================================
+        #  Use the FORCE
+        # ======================================================
+            
+        local ADJUSTMENT = 0.025
+        local TickScale = tickInterval() / (1 / 66) 
+        
+        entity():applyForce(entity():up() * G_NetForce * ADJUSTMENT * TickScale * G_WEIGHTSCALE)   
+        
+        if (G_BoilerExplosionForce)
+        {
+            Base:applyForce(-entity():up() * 900000 * G_BoilerExplosionForce)     
+        }                                
+    }                                                        
+}
+
