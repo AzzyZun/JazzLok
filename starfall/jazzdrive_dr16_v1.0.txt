@@ -1,0 +1,126 @@
+--@name jazzDrive dr16 v1.0
+--@author Azzy
+--@shared
+
+if SERVER then
+    wire.adjustInputs(  { "FGuide" }, { "Number" } )
+    
+    local lastF = 0
+    
+    timer.create("runtime", 0.05, 0, function()          
+        local f = wire.ports.FGuide
+        
+        if f ~= lastF then
+            net.start("update")
+            net.writeFloat(f)
+            net.send()  
+            lastF = f
+        end
+    end)
+else
+    local MIN_WINDOW = 0.1       
+    local MAX_WINDOW = 0.5       
+    local SPIKE_THRESHOLD = 5.0  
+
+    local inverter = sounds.create( chip(), "train sounds/de/traxx late/traction.wav", true )
+    local inverterBass = sounds.create( chip(), "synth/sine_440.wav", true )
+    local motorHum = sounds.create( chip(), "ambient/machines/air_conditioner_loop_1.wav", true )
+
+    local DSP = 1
+    
+    inverter:setDSP(DSP) 
+    inverter:play() 
+    inverter:setVolume(0.6) 
+    
+    inverterBass:setDSP(DSP)
+    inverterBass:play() 
+    inverterBass:setSoundLevel(90)
+    
+    motorHum:setDSP(DSP)
+    motorHum:play()
+
+    local choppingPulse = { 0, 0, 19, 17, 15, 13, 11, 9, 7, 5, 3, 1 }
+    local choppingMax = { 5, 11.3, 11.9, 13.3, 15.17, 19, 20.8, 24.9, 35.5, 44.6, 55, 150 }   
+    local pitchTune = 1.1
+    
+    local fGuide = 0       
+    local pendingF = 0      
+    local spikeTimer = 0    
+    local fModulation = 0   
+    local fPitchSmooth = 0  
+    local acc = 0
+    local previousVelocity = 0
+    local previousTime = timer.curtime()
+        
+    net.receive("update", function() 
+        local rawF = net.readFloat() 
+        accGuide = net.readFloat()
+        
+        local diff = math.abs(rawF - fGuide)
+        
+        if diff > SPIKE_THRESHOLD then
+            local dynamicWindow = math.clamp( (fGuide / 50) * MAX_WINDOW, MIN_WINDOW, MAX_WINDOW )
+            pendingF = rawF
+            spikeTimer = timer.curtime() + dynamicWindow
+        else
+            fGuide = rawF
+            pendingF = rawF 
+            spikeTimer = 0  
+        end
+    end)
+    
+    timer.create("smoothingTimer", 0.1, 0, function()
+        local currentTime = timer.curtime()
+        local deltaTime = currentTime - previousTime
+        local deltaVelocity = fGuide - previousVelocity
+                
+        if deltaTime > 0 then
+            acc = (math.abs(deltaVelocity / deltaTime)) * 0.05 
+        end
+        
+        previousVelocity = fGuide
+        previousTime = currentTime              
+    end)
+                            
+    hook.add("Think", "AudioLoop", function()
+        if timer.curtime() > spikeTimer then
+            fGuide = pendingF
+        end
+        
+        local approachRate = (0.05 + acc) * (timer.frametime() * 60)
+        
+        if fModulation < fGuide then
+            fModulation = math.min(fModulation + approachRate, fGuide)
+        elseif fModulation > fGuide then
+            fModulation = math.max(fModulation - approachRate, fGuide)
+        end
+        
+        fPitchSmooth = fPitchSmooth + (fModulation - fPitchSmooth) * (timer.frametime() * 15)
+        
+        inverterBass:setPitch(fPitchSmooth / 4.4)
+               
+        motorHum:setPitch(fPitchSmooth * 1.25)
+        motorHum:setVolume(math.clamp((fPitchSmooth - 20) * 0.01, 0, 0.5))
+        
+        local pulseCount = 0
+        for i = 1, #choppingMax do
+            if fModulation < choppingMax[i] then
+                pulseCount = choppingPulse[i]
+                break
+            end
+        end
+        
+        local finalPitchHz = (pulseCount * 2) * fPitchSmooth / 440 * 100
+
+        if fGuide < 11.3 then
+            finalPitchHz = 53
+        end
+                
+        if fGuide < 5 then
+            finalPitchHz = 38.7
+        end
+                            
+        inverter:setPitch(finalPitchHz * 2 * pitchTune)
+        inverter:setVolume(fGuide)        
+    end)
+end
